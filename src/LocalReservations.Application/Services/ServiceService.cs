@@ -1,0 +1,89 @@
+using LocalReservations.Application.DTOs;
+using LocalReservations.Application.Interfaces;
+using LocalReservations.Domain.Entities;
+
+namespace LocalReservations.Application.Services;
+
+public class ServiceService : IServiceService
+{
+    private readonly IServiceRepository _repository;
+    private readonly IBusinessRepository _businessRepository;
+
+    public ServiceService(IServiceRepository repository, IBusinessRepository businessRepository)
+    {
+        _repository = repository;
+        _businessRepository = businessRepository;
+    }
+
+    public async Task<ServiceDto> CreateAsync(Guid businessId, CreateServiceRequest request)
+    {
+        var businessExists = await _businessRepository.ExistsAsync(businessId);
+        if (!businessExists)
+            throw new InvalidOperationException("Business not found");
+
+        var service = new Service
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Price = request.Price,
+            DurationMinutes = request.DurationMinutes,
+            BusinessId = businessId
+        };
+
+        var created = await _repository.AddAsync(service);
+        return MapToDto(created);
+    }
+
+    public async Task<ServiceDto?> GetByIdAsync(Guid id)
+    {
+        var service = await _repository.GetByIdAsync(id);
+        return service == null ? null : MapToDto(service);
+    }
+
+    public async Task<IEnumerable<ServiceDto>> GetByBusinessAsync(Guid businessId)
+    {
+        var services = await _repository.GetByBusinessAsync(businessId);
+        return services.Select(MapToDto);
+    }
+
+    public async Task<ServiceDto> UpdateAsync(Guid id, UpdateServiceRequest request)
+    {
+        var service = await _repository.GetByIdAsync(id);
+        if (service == null)
+            throw new InvalidOperationException("Service not found");
+
+        if (!string.IsNullOrEmpty(request.Name)) service.Name = request.Name;
+        if (!string.IsNullOrEmpty(request.Description)) service.Description = request.Description;
+        if (request.Price > 0) service.Price = request.Price;
+        if (request.DurationMinutes > 0) service.DurationMinutes = request.DurationMinutes;
+        service.IsActive = request.IsActive;
+        service.UpdatedAt = DateTime.UtcNow;
+
+        await _repository.UpdateAsync(service);
+        return MapToDto(service);
+    }
+
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        var service = await _repository.GetByIdAsync(id);
+        if (service == null) return false;
+
+        await _repository.DeleteAsync(id);
+        return true;
+    }
+
+    private static ServiceDto MapToDto(Service service)
+    {
+        return new ServiceDto
+        {
+            Id = service.Id,
+            Name = service.Name,
+            Description = service.Description,
+            Price = service.Price,
+            DurationMinutes = service.DurationMinutes,
+            IsActive = service.IsActive,
+            BusinessId = service.BusinessId,
+            CreatedAt = service.CreatedAt
+        };
+    }
+}
