@@ -16,7 +16,7 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-              LocalReservations
+              CitaExpress
             </Link>
             <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
               <Link
