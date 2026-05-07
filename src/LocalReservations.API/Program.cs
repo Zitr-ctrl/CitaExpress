@@ -52,6 +52,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddMemoryCache();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>

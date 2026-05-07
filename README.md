@@ -11,13 +11,18 @@ Sistema de gestión de reservas para negocios locales (clínicas, salones, consu
 
 ## Características
 
-- **Autenticación JWT** - Registro e inicio de sesión con tokens seguros
+- **Autenticación JWT** - Registro e inicio de sesión con tokens seguros (BCrypt para passwords)
 - **Gestión de Negocios** - Administradores crean, editan y eliminan negocios
 - **Gestión de Servicios** - Cada negocio ofrece servicios con precio y duración
 - **Sistema de Reservas** - Clientes reservan horarios disponibles con validación
 - **Panel de Administración** - Dashboard completo para admins (usuarios, reservas, servicios)
+- **Búsqueda Global** - Filtro de búsqueda en todas las tablas (negocios, reservas, servicios, usuarios)
+- **Paginación Server-Side** - Resultados paginados con cache en backend (5min negocios/servicios, 1min slots)
+- **Validación de Formularios** - Zod + React Hook Form para validación robusta
+- **Notificaciones Toast** - Feedback visual para acciones exitosas y errores
 - **Tema Oscuro/Light** - Toggle manual para cambiar entre modos
 - **API Documentada** - Swagger disponible en `/swagger`
+- **Rate Limiting** - Protección contra ataques de fuerza bruta (5/min login, 3/5min registro)
 
 ---
 
@@ -31,7 +36,9 @@ Sistema de gestión de reservas para negocios locales (clínicas, salones, consu
 | Entity Framework Core | 8.0.0 | ORM para acceso a datos |
 | SQLite | - | Base de datos ligera |
 | JWT Bearer | 8.0.0 | Autenticación por tokens |
+| BCrypt | 6.0.0 | Hashing de contraseñas |
 | FluentValidation | 12.1.1 | Validación de entradas |
+| IMemoryCache | 8.0.1 | Cache en memoria |
 | Swashbuckle | 6.6.2 | Documentación Swagger |
 
 ### Frontend
@@ -43,6 +50,11 @@ Sistema de gestión de reservas para negocios locales (clínicas, salones, consu
 | React Router | 7.15.0 | Enrutamiento cliente |
 | Axios | 1.16.0 | Cliente HTTP |
 | Tailwind CSS | 4.2.4 | Estilos utilitarios |
+| TanStack Table | latest | Tablas con ordenamiento y búsqueda |
+| React Hook Form | latest | Formularios controlados |
+| Zod | latest | Validación de esquemas |
+| React Hot Toast | latest | Notificaciones |
+| Lucide React | latest | Iconos |
 
 ---
 
@@ -60,11 +72,14 @@ LocalReservations/
 │
 └── client/                              # Frontend React
     ├── src/
-    │   ├── components/                  # Componentes reutilizables
+    │   ├── components/
+    │   │   └── ui/                      # Componentes UI (DataTable, SearchInput, FormInput, etc.)
     │   ├── context/                     # Auth y Theme providers
     │   ├── pages/                       # Vistas de la aplicación
+    │   ├── schemas/                     # Esquemas Zod de validación
     │   ├── api.ts                       # Servicio Axios
-    │   └── types.ts                     # Interfaces TypeScript
+    │   ├── types.ts                     # Interfaces TypeScript
+    │   └── main.tsx                     # Entry point
     └── ...
 ```
 
@@ -77,6 +92,16 @@ Negocio (1) ──────< (N) Servicio       # Negocio ofrece servicios
 Negocio (1) ──────< (N) Reserva        # Negocio recibe reservas
 Servicio (1) ─────< (N) Reserva       # Servicio reservado
 ```
+
+---
+
+## Seguridad
+
+- **JWT**: Key configurada via variable de entorno (`JWT_KEY`), mínimo 32 caracteres
+- **Passwords**: BCrypt para hashing seguro (no almacenar en texto plano)
+- **Rate Limiting**: 5 intentos/min en login, 3 intentos/5min en registro
+- **CORS**: Restringido a localhost en desarrollo
+- **Validación**: FluentValidation en backend, Zod en frontend
 
 ---
 
@@ -103,6 +128,9 @@ Servicio (1) ─────< (N) Reserva       # Servicio reservado
 # Navegar al directorio del API
 cd src/LocalReservations.API
 
+# Configurar variable de entorno (Windows)
+$env:JWT_KEY="your-secure-key-at-least-32-characters-long"
+
 # Restaurar dependencias
 dotnet restore
 
@@ -111,6 +139,7 @@ dotnet run
 ```
 
 > La base de datos SQLite se crea automáticamente en la primera ejecución.
+> IMPORTANTE: En producción, la variable `JWT_KEY` es obligatoria. Sin ella, el servidor no arrancará.
 
 ### 2. Frontend
 

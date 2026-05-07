@@ -1,44 +1,41 @@
-import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { FormInput } from './ui';
+import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from '../schemas';
 
 interface AuthFormProps {
   mode: 'login' | 'register';
 }
 
 export default function AuthForm({ mode }: AuthFormProps) {
-  const { login, register } = useAuth();
+  const { login, register: registerUser } = useAuth();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData | RegisterFormData>({
+    resolver: zodResolver(mode === 'login' ? loginSchema : registerSchema) as any,
+    defaultValues: mode === 'login'
+      ? { email: '', password: '' }
+      : { name: '', email: '', phone: '', password: '' },
   });
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
+  const onSubmit = async (data: LoginFormData | RegisterFormData) => {
     try {
       if (mode === 'login') {
-        await login(formData.email, formData.password);
+        await login((data as LoginFormData).email, (data as LoginFormData).password);
       } else {
-        await register(formData.name, formData.email, formData.password, formData.phone);
+        const registerData = data as RegisterFormData;
+        await registerUser(registerData.name, registerData.email, registerData.password, registerData.phone);
       }
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || (mode === 'login' ? 'Error al iniciar sesión' : 'Error al registrarse'));
-    } finally {
-      setLoading(false);
+      toast.error(err.response?.data?.message || (mode === 'login' ? 'Error al iniciar sesión' : 'Error al registrarse'));
     }
   };
 
@@ -57,88 +54,48 @@ export default function AuthForm({ mode }: AuthFormProps) {
             </p>
           </div>
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {mode === 'register' && (
               <>
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Nombre completo
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-                    placeholder="Juan Pérez"
-                  />
-                </div>
+                <FormInput
+                  label="Nombre completo"
+                  placeholder="Juan Pérez"
+                  {...register('name')}
+                  error={(errors as any).name?.message}
+                />
 
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Teléfono
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-                    placeholder="+54 11 1234-5678"
-                  />
-                </div>
+                <FormInput
+                  label="Teléfono"
+                  type="tel"
+                  placeholder="+54 11 1234-5678"
+                  {...register('phone')}
+                  error={(errors as any).phone?.message}
+                />
               </>
             )}
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Correo electrónico
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-                placeholder="tu@email.com"
-              />
-            </div>
+            <FormInput
+              label="Correo electrónico"
+              type="email"
+              placeholder="tu@email.com"
+              {...register('email')}
+              error={errors.email?.message}
+            />
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Contraseña
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
-                placeholder="••••••••"
-              />
-            </div>
+            <FormInput
+              label="Contraseña"
+              type="password"
+              placeholder="••••••••"
+              {...register('password')}
+              error={errors.password?.message}
+            />
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
             >
-              {loading ? (
+              {isSubmitting ? (
                 <>
                   <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

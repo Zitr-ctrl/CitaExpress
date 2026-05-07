@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import toast from 'react-hot-toast';
 import type { User, AuthResponse } from '../types';
 import { authService } from '../api';
 
@@ -37,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('token', response.token);
     setToken(response.token);
     setUser(response.user);
+    toast.success(`Bienvenido, ${response.user.name}!`);
   };
 
   const register = async (name: string, email: string, password: string, phone: string) => {
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('token', response.token);
     setToken(response.token);
     setUser(response.user);
+    toast.success(`Cuenta creada. Bienvenido, ${response.user.name}!`);
   };
 
   const logout = () => {

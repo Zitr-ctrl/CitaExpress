@@ -26,7 +26,7 @@ export const authService = {
 };
 
 export const businessService = {
-  getAll: () => api.get('/businesses').then(res => res.data),
+  getAll: (page = 1, pageSize = 20) => api.get(`/businesses?page=${page}&pageSize=${pageSize}`).then(res => res.data),
   getById: (id: string) => api.get(`/businesses/${id}`).then(res => res.data),
   getMy: () => api.get('/businesses/my').then(res => res.data),
   create: (data: { name: string; description: string; address: string; phone: string; openTime?: string; closeTime?: string; slotDurationMinutes?: number }) =>

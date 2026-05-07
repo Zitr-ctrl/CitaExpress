@@ -1,6 +1,7 @@
 using LocalReservations.Application.DTOs;
 using LocalReservations.Application.Interfaces;
 using LocalReservations.Domain.Entities;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LocalReservations.Application.Services;
 
@@ -10,17 +11,21 @@ public class ReservationService : IReservationService
     private readonly IBusinessRepository _businessRepository;
     private readonly IServiceRepository _serviceRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IMemoryCache _cache;
+    private static readonly TimeSpan SlotsCacheDuration = TimeSpan.FromMinutes(1);
 
     public ReservationService(
         IReservationRepository repository,
         IBusinessRepository businessRepository,
         IServiceRepository serviceRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IMemoryCache cache)
     {
         _repository = repository;
         _businessRepository = businessRepository;
         _serviceRepository = serviceRepository;
         _userRepository = userRepository;
+        _cache = cache;
     }
 
     public async Task<ReservationDto> CreateAsync(CreateReservationRequest request, Guid userId)
@@ -54,6 +59,9 @@ public class ReservationService : IReservationService
 
         var created = await _repository.AddAsync(reservation);
         var user = await _userRepository.GetByIdAsync(userId);
+
+        _cache.Remove($"slots:{request.BusinessId}:{request.ReservationDate:yyyy-MM-dd}");
+
         return MapToDto(created, business, service, user);
     }
 
@@ -111,11 +119,17 @@ public class ReservationService : IReservationService
         reservation.UpdatedAt = DateTime.UtcNow;
         await _repository.UpdateAsync(reservation);
 
+        _cache.Remove($"slots:{reservation.BusinessId}:{reservation.ReservationDate:yyyy-MM-dd}");
+
         return true;
     }
 
     public async Task<IEnumerable<AvailableSlotDto>> GetAvailableSlotsAsync(Guid businessId, DateTime date)
     {
+        var cacheKey = $"slots:{businessId}:{date:yyyy-MM-dd}";
+        if (_cache.TryGetValue(cacheKey, out IEnumerable<AvailableSlotDto>? cached))
+            return cached!;
+
         var business = await _businessRepository.GetByIdAsync(businessId);
         if (business == null)
             throw new InvalidOperationException("Business not found");
@@ -142,6 +156,7 @@ public class ReservationService : IReservationService
             currentSlot = currentSlot.Add(TimeSpan.FromMinutes(business.SlotDurationMinutes));
         }
 
+        _cache.Set(cacheKey, slots, SlotsCacheDuration);
         return slots;
     }
 
@@ -158,6 +173,42 @@ public class ReservationService : IReservationService
         return result;
     }
 
+    public async Task<PagedResult<ReservationDto>> GetByUserPaginatedAsync(Guid userId, int page, int pageSize)
+    {
+        var (reservations, totalCount) = await _repository.GetByUserPaginatedAsync(userId, page, pageSize);
+        var items = new List<ReservationDto>();
+
+        foreach (var reservation in reservations)
+        {
+            var business = await _businessRepository.GetByIdAsync(reservation.BusinessId);
+            var service = await _serviceRepository.GetByIdAsync(reservation.ServiceId);
+            var user = await _userRepository.GetByIdAsync(reservation.UserId);
+            items.Add(MapToDto(reservation, business!, service!, user));
+        }
+
+        return new PagedResult<ReservationDto>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    public async Task<PagedResult<ReservationDto>> GetAllByOwnerPaginatedAsync(Guid ownerId, int page, int pageSize)
+    {
+        var (reservations, totalCount) = await _repository.GetAllByOwnerPaginatedAsync(ownerId, page, pageSize);
+        var items = reservations.Select(r => MapToDto(r, r.Business, r.Service, r.User)).ToList();
+
+        return new PagedResult<ReservationDto>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+    }
+
     public async Task<bool> CancelAsAdminAsync(Guid reservationId)
     {
         var reservation = await _repository.GetByIdAsync(reservationId);
@@ -166,6 +217,8 @@ public class ReservationService : IReservationService
         reservation.Status = ReservationStatus.Cancelled;
         reservation.UpdatedAt = DateTime.UtcNow;
         await _repository.UpdateAsync(reservation);
+
+        _cache.Remove($"slots:{reservation.BusinessId}:{reservation.ReservationDate:yyyy-MM-dd}");
 
         return true;
     }

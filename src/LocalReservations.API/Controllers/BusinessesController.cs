@@ -28,10 +28,14 @@ public class BusinessesController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<ActionResult<IEnumerable<BusinessDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<BusinessDto>>> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var businesses = await _businessService.GetAllAsync();
-        return Ok(businesses);
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+        if (pageSize > 50) pageSize = 50;
+
+        var result = await _businessService.GetAllPaginatedAsync(page, pageSize);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]

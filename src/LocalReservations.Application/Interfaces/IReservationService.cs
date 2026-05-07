@@ -7,9 +7,11 @@ public interface IReservationService
     Task<ReservationDto> CreateAsync(CreateReservationRequest request, Guid userId);
     Task<ReservationDto?> GetByIdAsync(Guid id);
     Task<IEnumerable<ReservationDto>> GetByUserAsync(Guid userId);
+    Task<PagedResult<ReservationDto>> GetByUserPaginatedAsync(Guid userId, int page, int pageSize);
     Task<IEnumerable<ReservationDto>> GetByBusinessAsync(Guid businessId);
     Task<bool> CancelAsync(Guid id, Guid userId);
     Task<IEnumerable<AvailableSlotDto>> GetAvailableSlotsAsync(Guid businessId, DateTime date);
     Task<IEnumerable<ReservationDto>> GetAllByOwnerAsync(Guid ownerId);
+    Task<PagedResult<ReservationDto>> GetAllByOwnerPaginatedAsync(Guid ownerId, int page, int pageSize);
     Task<bool> CancelAsAdminAsync(Guid reservationId);
 }

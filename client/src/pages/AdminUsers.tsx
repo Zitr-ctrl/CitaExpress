@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { ColumnDef } from '@tanstack/react-table';
+import toast from 'react-hot-toast';
 import { adminService } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { DataTable } from '../components/ui';
 import type { UserForAdmin } from '../types';
 
 export default function AdminUsers() {
@@ -20,26 +23,85 @@ export default function AdminUsers() {
   }, [user, navigate]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este usuario?')) return;
     if (id === user?.id) {
-      alert('No puedes eliminarte a ti mismo');
+      toast.error('No puedes eliminarte a ti mismo');
       return;
     }
     const targetUser = users.find(u => u.id === id);
     if (targetUser?.role === 'Admin') {
-      alert('No puedes eliminar a otro administrador');
+      toast.error('No puedes eliminar a otro administrador');
       return;
     }
     setDeletingId(id);
     try {
       await adminService.deleteUser(id);
       setUsers(prev => prev.filter(u => u.id !== id));
+      toast.success('Usuario eliminado correctamente');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error al eliminar el usuario');
+      toast.error(err.response?.data?.message || 'Error al eliminar el usuario');
     } finally {
       setDeletingId(null);
     }
   };
+
+  const columns: ColumnDef<UserForAdmin>[] = [
+    { accessorKey: 'name', header: 'Nombre' },
+    { accessorKey: 'email', header: 'Email' },
+    { accessorKey: 'phone', header: 'Teléfono' },
+    {
+      accessorKey: 'role',
+      header: 'Rol',
+      cell: ({ row }) => {
+        const isAdmin = row.original.role === 'Admin';
+        return (
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+            isAdmin
+              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'
+              : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
+          }`}>
+            {isAdmin ? 'Admin' : 'Cliente'}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Fecha Registro',
+      cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString('es-ES'),
+    },
+    {
+      id: 'actions',
+      header: 'Acciones',
+      cell: ({ row }) => {
+        const isCurrentUser = row.original.id === user?.id;
+        const isAdmin = row.original.role === 'Admin';
+
+        if (isCurrentUser || isAdmin) {
+          return <span className="text-sm text-gray-400 dark:text-gray-500">-</span>;
+        }
+
+        return (
+          <button
+            onClick={() => handleDelete(row.original.id)}
+            disabled={deletingId === row.original.id}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {deletingId === row.original.id ? (
+              <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            )}
+            Eliminar
+          </button>
+        );
+      },
+    },
+  ];
 
   if (loading) {
     return (
@@ -60,72 +122,12 @@ export default function AdminUsers() {
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700/50">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Nombre</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Email</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Teléfono</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Rol</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Fecha Registro</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{u.name}</td>
-                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{u.email}</td>
-                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{u.phone}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                      u.role === 'Admin'
-                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
-                    }`}>
-                      {u.role === 'Admin' ? 'Admin' : 'Cliente'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
-                    {new Date(u.createdAt).toLocaleDateString('es-ES')}
-                  </td>
-                  <td className="px-6 py-4">
-                    {u.id !== user?.id && u.role !== 'Admin' && (
-                      <button
-                        onClick={() => handleDelete(u.id)}
-                        disabled={deletingId === u.id}
-                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {deletingId === u.id ? (
-                          <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        )}
-                        Eliminar
-                      </button>
-                    )}
-                    {(u.id === user?.id || u.role === 'Admin') && (
-                      <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {users.length === 0 && (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              No hay usuarios registrados
-            </div>
-          )}
-        </div>
-      </div>
+      <DataTable
+        data={users}
+        columns={columns}
+        loading={loading}
+        emptyMessage="No hay usuarios registrados"
+      />
     </div>
   );
 }

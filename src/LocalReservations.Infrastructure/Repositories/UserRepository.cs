@@ -20,6 +20,17 @@ public class UserRepository : IUserRepository
     public async Task<IEnumerable<User>> GetAllAsync()
         => await _context.Users.ToListAsync();
 
+    public async Task<(IEnumerable<User> Items, int TotalCount)> GetAllPaginatedAsync(int page, int pageSize)
+    {
+        var totalCount = await _context.Users.CountAsync();
+        var items = await _context.Users
+            .OrderBy(u => u.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+        return (items, totalCount);
+    }
+
     public async Task<User> AddAsync(User entity)
     {
         _context.Users.Add(entity);

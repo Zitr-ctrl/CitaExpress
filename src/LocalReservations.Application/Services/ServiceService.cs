@@ -1,6 +1,7 @@
 using LocalReservations.Application.DTOs;
 using LocalReservations.Application.Interfaces;
 using LocalReservations.Domain.Entities;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LocalReservations.Application.Services;
 
@@ -8,11 +9,14 @@ public class ServiceService : IServiceService
 {
     private readonly IServiceRepository _repository;
     private readonly IBusinessRepository _businessRepository;
+    private readonly IMemoryCache _cache;
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-    public ServiceService(IServiceRepository repository, IBusinessRepository businessRepository)
+    public ServiceService(IServiceRepository repository, IBusinessRepository businessRepository, IMemoryCache cache)
     {
         _repository = repository;
         _businessRepository = businessRepository;
+        _cache = cache;
     }
 
     public async Task<ServiceDto> CreateAsync(Guid businessId, CreateServiceRequest request)
@@ -31,19 +35,33 @@ public class ServiceService : IServiceService
         };
 
         var created = await _repository.AddAsync(service);
+        _cache.Remove($"services:business:{businessId}");
         return MapToDto(created);
     }
 
     public async Task<ServiceDto?> GetByIdAsync(Guid id)
     {
+        var cacheKey = $"services:{id}";
+        if (_cache.TryGetValue(cacheKey, out ServiceDto? cached))
+            return cached;
+
         var service = await _repository.GetByIdAsync(id);
-        return service == null ? null : MapToDto(service);
+        var dto = service == null ? null : MapToDto(service);
+        if (dto != null)
+            _cache.Set(cacheKey, dto, CacheDuration);
+        return dto;
     }
 
     public async Task<IEnumerable<ServiceDto>> GetByBusinessAsync(Guid businessId)
     {
+        var cacheKey = $"services:business:{businessId}";
+        if (_cache.TryGetValue(cacheKey, out IEnumerable<ServiceDto>? cached))
+            return cached!;
+
         var services = await _repository.GetByBusinessAsync(businessId);
-        return services.Select(MapToDto);
+        var dtos = services.Select(MapToDto).ToList();
+        _cache.Set(cacheKey, dtos, CacheDuration);
+        return dtos;
     }
 
     public async Task<ServiceDto> UpdateAsync(Guid id, UpdateServiceRequest request)
@@ -60,6 +78,8 @@ public class ServiceService : IServiceService
         service.UpdatedAt = DateTime.UtcNow;
 
         await _repository.UpdateAsync(service);
+        _cache.Remove($"services:{id}");
+        _cache.Remove($"services:business:{service.BusinessId}");
         return MapToDto(service);
     }
 
@@ -69,6 +89,8 @@ public class ServiceService : IServiceService
         if (service == null) return false;
 
         await _repository.DeleteAsync(id);
+        _cache.Remove($"services:{id}");
+        _cache.Remove($"services:business:{service.BusinessId}");
         return true;
     }
 

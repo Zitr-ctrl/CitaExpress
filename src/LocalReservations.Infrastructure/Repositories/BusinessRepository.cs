@@ -20,6 +20,17 @@ public class BusinessRepository : IBusinessRepository
     public async Task<IEnumerable<Business>> GetAllAsync()
         => await _context.Businesses.ToListAsync();
 
+    public async Task<(IEnumerable<Business> Items, int TotalCount)> GetAllPaginatedAsync(int page, int pageSize)
+    {
+        var totalCount = await _context.Businesses.CountAsync();
+        var items = await _context.Businesses
+            .OrderBy(b => b.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+        return (items, totalCount);
+    }
+
     public async Task<Business> AddAsync(Business entity)
     {
         _context.Businesses.Add(entity);

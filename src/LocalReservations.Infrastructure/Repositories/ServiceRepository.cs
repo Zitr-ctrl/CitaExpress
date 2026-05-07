@@ -20,6 +20,17 @@ public class ServiceRepository : IServiceRepository
     public async Task<IEnumerable<Service>> GetAllAsync()
         => await _context.Services.ToListAsync();
 
+    public async Task<(IEnumerable<Service> Items, int TotalCount)> GetAllPaginatedAsync(int page, int pageSize)
+    {
+        var totalCount = await _context.Services.CountAsync();
+        var items = await _context.Services
+            .OrderBy(s => s.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+        return (items, totalCount);
+    }
+
     public async Task<Service> AddAsync(Service entity)
     {
         _context.Services.Add(entity);

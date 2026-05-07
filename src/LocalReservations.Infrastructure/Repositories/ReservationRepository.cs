@@ -20,6 +20,20 @@ public class ReservationRepository : IReservationRepository
     public async Task<IEnumerable<Reservation>> GetAllAsync()
         => await _context.Reservations.ToListAsync();
 
+    public async Task<(IEnumerable<Reservation> Items, int TotalCount)> GetAllPaginatedAsync(int page, int pageSize)
+    {
+        var totalCount = await _context.Reservations.CountAsync();
+        var items = await _context.Reservations
+            .Include(r => r.Business)
+            .Include(r => r.Service)
+            .OrderByDescending(r => r.ReservationDate)
+            .ThenByDescending(r => r.StartTime)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+        return (items, totalCount);
+    }
+
     public async Task<Reservation> AddAsync(Reservation entity)
     {
         _context.Reservations.Add(entity);
@@ -56,6 +70,24 @@ public class ReservationRepository : IReservationRepository
         return reservations
             .OrderByDescending(r => r.ReservationDate)
             .ThenByDescending(r => r.StartTime);
+    }
+
+    public async Task<(IEnumerable<Reservation> Items, int TotalCount)> GetByUserPaginatedAsync(Guid userId, int page, int pageSize)
+    {
+        var query = _context.Reservations
+            .Include(r => r.Business)
+            .Include(r => r.Service)
+            .Where(r => r.UserId == userId);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(r => r.ReservationDate)
+            .ThenByDescending(r => r.StartTime)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
     }
 
     public async Task<IEnumerable<Reservation>> GetByBusinessAsync(Guid businessId)
@@ -106,5 +138,29 @@ public class ReservationRepository : IReservationRepository
         return reservations
             .OrderByDescending(r => r.ReservationDate)
             .ThenByDescending(r => r.StartTime);
+    }
+
+    public async Task<(IEnumerable<Reservation> Items, int TotalCount)> GetAllByOwnerPaginatedAsync(Guid ownerId, int page, int pageSize)
+    {
+        var businessIds = await _context.Businesses
+            .Where(b => b.OwnerId == ownerId)
+            .Select(b => b.Id)
+            .ToListAsync();
+
+        var query = _context.Reservations
+            .Include(r => r.User)
+            .Include(r => r.Business)
+            .Include(r => r.Service)
+            .Where(r => businessIds.Contains(r.BusinessId));
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(r => r.ReservationDate)
+            .ThenByDescending(r => r.StartTime)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
     }
 }

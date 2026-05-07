@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { ColumnDef } from '@tanstack/react-table';
+import toast from 'react-hot-toast';
 import { adminService, businessService } from '../api';
 import { useAuth } from '../context/AuthContext';
-import type { AdminReservation, Business, CreateBusinessRequest } from '../types';
+import { FormInput, FormTextarea, DataTable } from '../components/ui';
+import { businessSchema, type BusinessFormData } from '../schemas';
+import type { AdminReservation, Business } from '../types';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -14,11 +20,20 @@ export default function AdminDashboard() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showBusinessForm, setShowBusinessForm] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
-  const [businessForm, setBusinessForm] = useState<CreateBusinessRequest>({
-    name: '',
-    description: '',
-    address: '',
-    phone: '',
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<BusinessFormData>({
+    resolver: zodResolver(businessSchema) as any,
+    defaultValues: {
+      name: '',
+      description: '',
+      address: '',
+      phone: '',
+    },
   });
 
   useEffect(() => {
@@ -36,40 +51,41 @@ export default function AdminDashboard() {
   }, [selectedBusiness]);
 
   const handleCancel = async (id: string) => {
-    if (!confirm('¿Estás seguro de que quieres cancelar esta reserva?')) return;
     setCancellingId(id);
     try {
       await adminService.cancelReservation(id);
       setReservations(prev => prev.map(r => r.id === id ? { ...r, status: 'Cancelled' } : r));
+      toast.success('Reserva cancelada correctamente');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error al cancelar la reserva');
+      toast.error(err.response?.data?.message || 'Error al cancelar la reserva');
     } finally {
       setCancellingId(null);
     }
   };
 
-  const handleBusinessSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onBusinessSubmit = async (data: BusinessFormData) => {
     try {
       if (editingBusiness) {
-        await businessService.update(editingBusiness.id, businessForm);
+        await businessService.update(editingBusiness.id, data);
+        toast.success('Negocio actualizado correctamente');
       } else {
-        await businessService.create(businessForm);
+        await businessService.create(data);
+        toast.success('Negocio creado correctamente');
       }
       businessService.getMy().then(setBusinesses).catch(console.error);
       setShowBusinessForm(false);
       setEditingBusiness(null);
-      setBusinessForm({ name: '', description: '', address: '', phone: '' });
+      reset({ name: '', description: '', address: '', phone: '' });
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error al guardar el negocio');
+      toast.error(err.response?.data?.message || 'Error al guardar el negocio');
     }
   };
 
   const handleEditBusiness = (business: Business) => {
     setEditingBusiness(business);
-    setBusinessForm({
+    reset({
       name: business.name,
-      description: business.description,
+      description: business.description || '',
       address: business.address,
       phone: business.phone,
     });
@@ -77,15 +93,123 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteBusiness = async (id: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este negocio?')) return;
     try {
       await businessService.delete(id);
       setBusinesses(prev => prev.filter(b => b.id !== id));
       if (selectedBusiness === id) setSelectedBusiness('');
+      toast.success('Negocio eliminado correctamente');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error al eliminar el negocio');
+      toast.error(err.response?.data?.message || 'Error al eliminar el negocio');
     }
   };
+
+  const handleCloseForm = () => {
+    setShowBusinessForm(false);
+    setEditingBusiness(null);
+    reset({ name: '', description: '', address: '', phone: '' });
+  };
+
+  const businessColumns: ColumnDef<Business>[] = [
+    { accessorKey: 'name', header: 'Nombre' },
+    { accessorKey: 'address', header: 'Dirección' },
+    { accessorKey: 'phone', header: 'Teléfono' },
+    {
+      id: 'actions',
+      header: 'Acciones',
+      cell: ({ row }) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleEditBusiness(row.original)}
+            className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => handleDeleteBusiness(row.original.id)}
+            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+          >
+            Eliminar
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const reservationColumns: ColumnDef<AdminReservation>[] = [
+    {
+      accessorKey: 'userName',
+      header: 'Cliente',
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium text-gray-900 dark:text-white">{row.original.userName}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">{row.original.userEmail}</div>
+        </div>
+      ),
+    },
+    { accessorKey: 'serviceName', header: 'Servicio' },
+    {
+      accessorKey: 'reservationDate',
+      header: 'Fecha',
+      cell: ({ row }) => new Date(row.original.reservationDate).toLocaleDateString('es-ES'),
+    },
+    {
+      accessorKey: 'startTime',
+      header: 'Horario',
+      cell: ({ row }) => (
+        <span className="font-mono">{row.original.startTime} - {row.original.endTime}</span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Estado',
+      cell: ({ row }) => {
+        const status = row.original.status;
+        const statusClasses = {
+          Confirmed: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+          Cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
+          Pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+        }[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+
+        const statusLabels = {
+          Confirmed: 'Confirmada',
+          Cancelled: 'Cancelada',
+          Pending: 'Pendiente',
+        }[status] || status;
+
+        return (
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusClasses}`}>
+            {statusLabels}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Acciones',
+      cell: ({ row }) => {
+        if (row.original.status !== 'Confirmed') return null;
+        return (
+          <button
+            onClick={() => handleCancel(row.original.id)}
+            disabled={cancellingId === row.original.id}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {cancellingId === row.original.id ? (
+              <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            Cancelar
+          </button>
+        );
+      },
+    },
+  ];
 
   if (loading) {
     return (
@@ -94,6 +218,8 @@ export default function AdminDashboard() {
       </div>
     );
   }
+
+  const filteredReservations = reservations.filter(r => r.businessId === selectedBusiness);
 
   return (
     <div>
@@ -110,7 +236,7 @@ export default function AdminDashboard() {
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Mis Negocios</h2>
           <button
-            onClick={() => { setShowBusinessForm(true); setEditingBusiness(null); setBusinessForm({ name: '', description: '', address: '', phone: '' }); }}
+            onClick={() => { reset({ name: '', description: '', address: '', phone: '' }); setEditingBusiness(null); setShowBusinessForm(true); }}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
           >
             + Agregar Negocio
@@ -122,56 +248,43 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
               {editingBusiness ? 'Editar Negocio' : 'Nuevo Negocio'}
             </h3>
-            <form onSubmit={handleBusinessSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre</label>
-                <input
-                  type="text"
-                  value={businessForm.name}
-                  onChange={(e) => setBusinessForm({ ...businessForm, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
-                <input
-                  type="text"
-                  value={businessForm.phone}
-                  onChange={(e) => setBusinessForm({ ...businessForm, phone: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  required
+            <form onSubmit={handleSubmit(onBusinessSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormInput
+                label="Nombre"
+                {...register('name')}
+                error={errors.name?.message}
+              />
+              <FormInput
+                label="Teléfono"
+                {...register('phone')}
+                error={errors.phone?.message}
+              />
+              <div className="md:col-span-2">
+                <FormInput
+                  label="Dirección"
+                  {...register('address')}
+                  error={errors.address?.message}
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dirección</label>
-                <input
-                  type="text"
-                  value={businessForm.address}
-                  onChange={(e) => setBusinessForm({ ...businessForm, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  required
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
-                <textarea
-                  value={businessForm.description}
-                  onChange={(e) => setBusinessForm({ ...businessForm, description: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                <FormTextarea
+                  label="Descripción"
                   rows={2}
+                  {...register('description')}
+                  error={errors.description?.message}
                 />
               </div>
               <div className="md:col-span-2 flex gap-3">
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium rounded-lg transition-colors"
                 >
-                  Guardar
+                  {isSubmitting ? 'Guardando...' : 'Guardar'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowBusinessForm(false); setEditingBusiness(null); }}
+                  onClick={handleCloseForm}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancelar
@@ -181,48 +294,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700/50">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Nombre</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Dirección</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Teléfono</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {businesses.map((business) => (
-                <tr key={business.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{business.name}</td>
-                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{business.address}</td>
-                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{business.phone}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditBusiness(business)}
-                        className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDeleteBusiness(business.id)}
-                        className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {businesses.length === 0 && (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              No tienes negocios registrados
-            </div>
-          )}
-        </div>
+        <DataTable
+          data={businesses}
+          columns={businessColumns}
+          emptyMessage="No tienes negocios registrados"
+        />
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
@@ -241,85 +317,19 @@ export default function AdminDashboard() {
             </select>
           )}
         </div>
-        {selectedBusiness && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Cliente</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Servicio</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Fecha</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Horario</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Estado</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {reservations.filter(r => r.businessId === selectedBusiness).map((reservation) => (
-                  <tr key={reservation.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 dark:text-white">{reservation.userName}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{reservation.userEmail}</div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{reservation.serviceName}</td>
-                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
-                      {new Date(reservation.reservationDate).toLocaleDateString('es-ES')}
-                    </td>
-                    <td className="px-6 py-4 font-mono text-gray-700 dark:text-gray-300">
-                      {reservation.startTime} - {reservation.endTime}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        reservation.status === 'Confirmed'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                          : reservation.status === 'Cancelled'
-                          ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300'
-                      }`}>
-                        {reservation.status === 'Confirmed' ? 'Confirmada' :
-                         reservation.status === 'Cancelled' ? 'Cancelada' : 'Pendiente'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {reservation.status === 'Confirmed' && (
-                        <button
-                          onClick={() => handleCancel(reservation.id)}
-                          disabled={cancellingId === reservation.id}
-                          className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          {cancellingId === reservation.id ? (
-                            <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          )}
-                          Cancelar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {reservations.filter(r => r.businessId === selectedBusiness).length === 0 && (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                No hay reservas para este negocio
-              </div>
-            )}
-          </div>
-        )}
-        {!selectedBusiness && businesses.length > 0 && (
+
+        {selectedBusiness ? (
+          <DataTable
+            data={filteredReservations}
+            columns={reservationColumns}
+            emptyMessage="No hay reservas para este negocio"
+            searchPlaceholder="Buscar por cliente, servicio..."
+          />
+        ) : (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            Selecciona un negocio para ver sus reservas
-          </div>
-        )}
-        {businesses.length === 0 && !loading && (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            Agrega un negocio para ver reservas
+            {businesses.length > 0
+              ? 'Selecciona un negocio para ver sus reservas'
+              : 'Agrega un negocio para ver reservas'}
           </div>
         )}
       </div>

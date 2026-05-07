@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { businessService, serviceService, reservationService } from '../api';
 import type { Business, Service, AvailableSlot } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -48,9 +49,10 @@ export default function BusinessDetail() {
         serviceId: selectedService,
         notes
       });
+      toast.success('Reserva creada correctamente');
       navigate('/my-reservations');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error al crear la reserva');
+      toast.error(err.response?.data?.message || 'Error al crear la reserva');
     } finally {
       setSubmitting(false);
     }
