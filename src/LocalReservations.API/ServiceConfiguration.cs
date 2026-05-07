@@ -5,6 +5,7 @@ using LocalReservations.Application.DTOs;
 using LocalReservations.Application.Interfaces;
 using LocalReservations.Application.Services;
 using LocalReservations.Application.Validators;
+using LocalReservations.BackgroundServices;
 using LocalReservations.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -20,11 +21,17 @@ public static class ServiceConfiguration
         services.AddScoped<IBusinessRepository, BusinessRepository>();
         services.AddScoped<IServiceRepository, ServiceRepository>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
+        services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IBusinessService, BusinessService>();
         services.AddScoped<IServiceService, ServiceService>();
         services.AddScoped<IReservationService, ReservationService>();
+        services.AddScoped<INotificationService, NotificationService>();
+
+        services.AddHttpClient<IWhatsAppService, WhatsAppService>();
+
+        services.AddHostedService<ReminderBackgroundService>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 

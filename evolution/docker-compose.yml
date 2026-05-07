@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - AUTHENTICATION_API_KEY=your-secret-api-key-change-in-production
+      - DEL_INSTANCE=false
+      - WEBHOOK_GLOBAL_ENABLED=false
+      - LOG_LEVEL=INFO
+    volumes:
+      - evolution_data:/evolution/instances
+
+volumes:
+  evolution_data:
+    driver: local

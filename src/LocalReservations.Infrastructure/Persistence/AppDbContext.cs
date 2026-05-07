@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
     public DbSet<Business> Businesses => Set<Business>();
     public DbSet<Service> Services => Set<Service>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
+    public DbSet<NotificationLog> NotificationLogs => Set<NotificationLog>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -65,6 +66,19 @@ public class AppDbContext : DbContext
                   .HasForeignKey(e => e.ServiceId)
                   .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(e => new { e.BusinessId, e.ReservationDate, e.StartTime });
+        });
+
+        modelBuilder.Entity<NotificationLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Type).HasConversion<string>();
+            entity.Property(e => e.PhoneNumber).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.MessageContent).IsRequired();
+            entity.HasOne(e => e.Reservation)
+                  .WithMany()
+                  .HasForeignKey(e => e.ReservationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.ReservationId);
         });
     }
 }

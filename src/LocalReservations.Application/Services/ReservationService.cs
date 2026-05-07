@@ -11,6 +11,7 @@ public class ReservationService : IReservationService
     private readonly IBusinessRepository _businessRepository;
     private readonly IServiceRepository _serviceRepository;
     private readonly IUserRepository _userRepository;
+    private readonly INotificationService _notificationService;
     private readonly IMemoryCache _cache;
     private static readonly TimeSpan SlotsCacheDuration = TimeSpan.FromMinutes(1);
 
@@ -19,12 +20,14 @@ public class ReservationService : IReservationService
         IBusinessRepository businessRepository,
         IServiceRepository serviceRepository,
         IUserRepository userRepository,
+        INotificationService notificationService,
         IMemoryCache cache)
     {
         _repository = repository;
         _businessRepository = businessRepository;
         _serviceRepository = serviceRepository;
         _userRepository = userRepository;
+        _notificationService = notificationService;
         _cache = cache;
     }
 
@@ -61,6 +64,15 @@ public class ReservationService : IReservationService
         var user = await _userRepository.GetByIdAsync(userId);
 
         _cache.Remove($"slots:{request.BusinessId}:{request.ReservationDate:yyyy-MM-dd}");
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _notificationService.SendReservationCreatedAsync(created.Id);
+            }
+            catch { }
+        });
 
         return MapToDto(created, business, service, user);
     }

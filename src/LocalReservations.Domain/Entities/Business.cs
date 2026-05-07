@@ -9,6 +9,7 @@ public class Business : BaseEntity
     public TimeSpan OpenTime { get; set; }
     public TimeSpan CloseTime { get; set; }
     public int SlotDurationMinutes { get; set; } = 30;
+    public bool WhatsAppNotificationsEnabled { get; set; } = true;
 
     public Guid OwnerId { get; set; }
     public User Owner { get; set; } = null!;

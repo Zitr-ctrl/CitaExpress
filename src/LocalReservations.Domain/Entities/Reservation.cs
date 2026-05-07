@@ -15,6 +15,7 @@ public class Reservation : BaseEntity
     public TimeSpan EndTime { get; set; }
     public ReservationStatus Status { get; set; } = ReservationStatus.Pending;
     public string Notes { get; set; } = string.Empty;
+    public bool ReminderSent { get; set; } = false;
 
     public Guid UserId { get; set; }
     public User User { get; set; } = null!;

@@ -163,4 +163,27 @@ public class ReservationRepository : IReservationRepository
 
         return (items, totalCount);
     }
+
+    public async Task<IEnumerable<Reservation>> GetForRemindersAsync(DateTime fromDate, DateTime toDate)
+    {
+        return await _context.Reservations
+            .Include(r => r.User)
+            .Include(r => r.Business)
+            .Include(r => r.Service)
+            .Where(r =>
+                r.Status == ReservationStatus.Confirmed &&
+                !r.ReminderSent &&
+                r.ReservationDate.Date >= fromDate.Date &&
+                r.ReservationDate.Date <= toDate.Date)
+            .ToListAsync();
+    }
+
+    public async Task<Reservation?> GetByIdWithDetailsAsync(Guid id)
+    {
+        return await _context.Reservations
+            .Include(r => r.User)
+            .Include(r => r.Business)
+            .Include(r => r.Service)
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
 }
