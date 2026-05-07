@@ -77,13 +77,11 @@ public class AuthService : IAuthService
 
     public static string HashPassword(string password)
     {
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var hashedBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-        return Convert.ToBase64String(hashedBytes);
+        return BCrypt.Net.BCrypt.HashPassword(password);
     }
 
-    private static bool VerifyPassword(string password, string hash)
+    public static bool VerifyPassword(string password, string hash)
     {
-        return HashPassword(password) == hash;
+        return BCrypt.Net.BCrypt.Verify(password, hash);
     }
 }

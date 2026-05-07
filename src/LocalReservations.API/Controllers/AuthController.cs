@@ -4,9 +4,11 @@ using System.Text;
 using FluentValidation;
 using LocalReservations.Application.DTOs;
 using LocalReservations.Application.Interfaces;
+using LocalReservations.Application.Services;
 using LocalReservations.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 
 namespace LocalReservations.API.Controllers;
@@ -33,6 +35,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting("register")]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
     {
         var validationResult = await _registerValidator.ValidateAsync(request);
@@ -47,7 +50,7 @@ public class AuthController : ControllerBase
         {
             Name = request.Name,
             Email = request.Email,
-            PasswordHash = HashPassword(request.Password),
+            PasswordHash = AuthService.HashPassword(request.Password),
             Phone = request.Phone,
             Role = UserRole.Client
         };
@@ -64,6 +67,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("login")]
     public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
     {
         var validationResult = await _loginValidator.ValidateAsync(request);
@@ -71,7 +75,7 @@ public class AuthController : ControllerBase
             return BadRequest(validationResult.Errors);
 
         var user = await _userRepository.GetByEmailAsync(request.Email);
-        if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
+        if (user == null || !AuthService.VerifyPassword(request.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid credentials" });
 
         var response = new AuthResponse
@@ -136,17 +140,5 @@ public class AuthController : ControllerBase
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    private static string HashPassword(string password)
-    {
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var hashedBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-        return Convert.ToBase64String(hashedBytes);
-    }
-
-    private static bool VerifyPassword(string password, string hash)
-    {
-        return HashPassword(password) == hash;
     }
 }
