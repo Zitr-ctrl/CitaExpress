@@ -22,7 +22,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     resolver: zodResolver(mode === 'login' ? loginSchema : registerSchema) as any,
     defaultValues: mode === 'login'
       ? { email: '', password: '' }
-      : { name: '', email: '', phone: '', password: '' },
+      : { name: '', email: '', phone: '', password: '', confirmPassword: '' },
   });
 
   const onSubmit = async (data: LoginFormData | RegisterFormData) => {
@@ -86,9 +86,21 @@ export default function AuthForm({ mode }: AuthFormProps) {
               label="Contraseña"
               type="password"
               placeholder="••••••••"
+              showPasswordToggle
               {...register('password')}
               error={errors.password?.message}
             />
+
+            {mode === 'register' && (
+              <FormInput
+                label="Confirmar contraseña"
+                type="password"
+                placeholder="••••••••"
+                showPasswordToggle
+                {...register('confirmPassword')}
+                error={(errors as any).confirmPassword?.message}
+              />
+            )}
 
             <button
               type="submit"
