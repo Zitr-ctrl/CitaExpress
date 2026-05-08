@@ -1,5 +1,8 @@
 using LocalReservations.Application.Interfaces;
 using LocalReservations.Domain.Entities;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace LocalReservations.BackgroundServices;
 

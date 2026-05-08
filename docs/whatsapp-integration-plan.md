@@ -278,3 +278,26 @@ El mensaje mostrará la hora en formato legible:
 2. **Reintentos:** Implementar reintento automático si falla el envío (max 3 intentos)
 3. **Formato de teléfono:** Validar en registro que el teléfono tenga formato `+593XXXXXXXXX`
 4. **Instancia desconectada:** Si WhatsApp se desconecta, los mensajes se perderán - considerar cola
+
+
+Opciones para ejecutar Docker sin Docker Desktop en Linux:
+1. Docker Engine (sin Desktop)
+Instala solo el daemon de Docker sin la interfaz gráfica:
+sudo apt install docker.io
+sudo systemctl start docker
+sudo systemctl enable docker
+2. Usar Podman (alternativa a Docker)
+No requiere daemon, compatible con Docker:
+sudo apt install podman
+podman-compose up -d
+3. Docker sin daemon (rootless)
+Usando dockerd directamente o contenedores sin privileged mode.
+4. Usar API de Evolution en la nube
+Si no puedes ejecutar Docker localmente, puedes usar una instancia Cloud de Evolution API:
+- Evolution API Cloud (servicios托管)
+- Chat API de WhatsApp (alternativa oficial)
+---
+Recomendación para tu caso:
+Si Docker no funciona bien en Kali, la opción más prática sería:
+1. Probar con Podman (reemplazo directo de Docker, sin daemon)
+2. O usar servicio cloud para Evolution API

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using LocalReservations.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace LocalReservations.Application.Services;
 
