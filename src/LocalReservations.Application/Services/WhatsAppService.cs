@@ -11,6 +11,7 @@ public class WhatsAppService : IWhatsAppService
 {
     private readonly HttpClient _httpClient;
     private readonly string _instanceName;
+    private readonly string _baseUrl;
     private readonly ILogger<WhatsAppService> _logger;
     private static readonly SemaphoreSlim _semaphore = new(1, 1);
     private const int MaxRetries = 3;
@@ -23,6 +24,7 @@ public class WhatsAppService : IWhatsAppService
     {
         _httpClient = httpClient;
         _instanceName = configuration["EvolutionApi:InstanceName"] ?? "localreservations";
+        _baseUrl = configuration["EvolutionApi:BaseUrl"] ?? "http://localhost:8080";
         _logger = logger;
 
         var apiKey = configuration["EvolutionApi:ApiKey"];
@@ -55,8 +57,7 @@ public class WhatsAppService : IWhatsAppService
                         text = text
                     };
 
-                    var baseUrl = "http://localhost:8080";
-                    var url = $"{baseUrl}/message/sendText/{_instanceName}";
+                    var url = $"{_baseUrl}/message/sendText/{_instanceName}";
 
                     var jsonContent = new StringContent(
                         JsonSerializer.Serialize(payload),
